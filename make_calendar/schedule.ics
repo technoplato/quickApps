@@ -1,0 +1,52 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//ChatGPT//EN
+BEGIN:VEVENT
+SUMMARY:Start building the foundation of your portfolio website
+DTSTART;TZID=US/Eastern:20230620T103000
+DTEND;TZID=US/Eastern:20230620T113000
+DESCRIPTION:Since this is a long-term project, an hour of focused work can help you make progress.
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Take a break and walk your dog
+DTSTART;TZID=US/Eastern:20230620T113000
+DTEND;TZID=US/Eastern:20230620T120000
+DESCRIPTION:This might also be a good time to avoid the rain and the peak heat before the calls start.
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Apply for jobs and reach out to DeepGram employees on LinkedIn
+DTSTART;TZID=US/Eastern:20230620T120000
+DTEND;TZID=US/Eastern:20230620T130000
+DESCRIPTION:
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Attend your scheduled calls
+DTSTART;TZID=US/Eastern:20230620T130000
+DTEND;TZID=US/Eastern:20230620T160000
+DESCRIPTION:
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Continue applying for jobs
+DTSTART;TZID=US/Eastern:20230620T160000
+DTEND;TZID=US/Eastern:20230620T173000
+DESCRIPTION:Spend this time shooting out applications and customizing cover letters.
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Resume working on your portfolio website
+DTSTART;TZID=US/Eastern:20230620T173000
+DTEND;TZID=US/Eastern:20230620T183000
+DESCRIPTION:Plan out the features you want to add, such as GraphQL integration and resume parsing.
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Wind down and prepare for your wife’s arrival
+DTSTART;TZID=US/Eastern:20230620T183000
+DTEND;TZID=US/Eastern:20230620T193000
+DESCRIPTION:Perhaps make dinner or tidy up the house.
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Spend quality time with your wife
+DTSTART;TZID=US/Eastern:20230620T193000
+DTEND;TZID=US/Eastern:20230620T235900
+DESCRIPTION:
+END:VEVENT
+END:VCALENDAR
