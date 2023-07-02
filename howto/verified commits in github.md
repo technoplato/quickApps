@@ -165,3 +165,29 @@ Go to the [Github - Add new GPG key](https://github.com/settings/gpg/new) page o
 In the "Key" field, paste the GPG key you copied in step 3.
 
 Click Add GPG key.
+
+## Debugging / Issues / Problems
+
+### error: gpg failed to sign the data
+
+#### Issue
+
+```sh
+❯ git commit -m "Whatever your commit message is"
+error: gpg failed to sign the data
+fatal: failed to write commit object
+
+~/Dev/03/A/c/go-gui on main +3 ──  base
+at 13:22:03 ❯
+```
+
+#### Cause
+
+~~Perhaps Powerlevel10k~~ (ABSOLUTELY Powerlevel10k)
+> tty command requires that stdin is attached to a terminal. When using Powerlevel10k, stdin is redirected from /dev/null when Instant Prompt is activated and until Zsh is fully initialized. This is explained in more detail in Powerlevel10k FAQ.
+
+> To solve this problem you can either move export GPG_TTY=$(tty) to the top of ~/.zshrc so that it executes before Instant Prompt is activated, or (better!) use export GPG_TTY=$TTY. The latter version will work anywhere and it's over 1000 times faster. TTY is a special parameter set by Zsh very early during initialization. It gives you access to the terminal even when stdin might be redirected.
+
+- from brilliant Stack post from [Roman Perepelitsa](https://unix.stackexchange.com/a/608921/375676)
+
+[StackOverflow answer reference 1](https://unix.stackexchange.com/a/715310/375676)
