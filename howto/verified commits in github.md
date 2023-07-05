@@ -130,7 +130,7 @@ For GPG to be able to interact with your terminal (for example, to ask for your 
 Open your shell configuration file (`.bashrc`, `.zshrc`, etc.) in a text editor and add the following line:
 
 ```
-export GPG_TTY=$(tty)
+export GPG_TTY=$TTY
 ```
 
 Save and close the file, then source your shell configuration file to apply the changes:
