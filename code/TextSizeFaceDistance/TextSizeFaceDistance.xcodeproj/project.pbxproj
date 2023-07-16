@@ -279,6 +279,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TextSizeFaceDistance/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "We use the camera to see how far your face is from the device to scale text";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Just so you can change the text on screen without typing";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Just so you can change the text on screen without typing";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -310,6 +312,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TextSizeFaceDistance/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "We use the camera to see how far your face is from the device to scale text";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Just so you can change the text on screen without typing";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Just so you can change the text on screen without typing";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
