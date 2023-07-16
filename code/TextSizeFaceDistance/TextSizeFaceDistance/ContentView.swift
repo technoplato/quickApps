@@ -6,25 +6,13 @@
 //
 
 import SwiftUI
-
-import SwiftUI
 import ARKit
 import Speech
 
-struct RecordedAudio : Identifiable, Codable {
-    let id: UUID
-    let fileURL: URL
-    let transcription: String
-    let segments: [Segment]  // new property
-}
-
-struct Segment: Codable {
-    let substring: String
-    let timestamp: TimeInterval
-    let duration: TimeInterval
-}
 
 struct ContentView: View {
+  @State private var columnVisibility =
+      NavigationSplitViewVisibility.detailOnly
   @State private var faceDistance: Float = 0
   @State private var previousFaceDistance: Float = 0
   
@@ -37,59 +25,68 @@ struct ContentView: View {
   private let speechRecognizer = SFSpeechRecognizer()
   
   let distanceThreshold: Float = 0.01 // Set a threshold for significant changes
-  let ss = ["one", "two"]
-  
   
   @ViewBuilder
   var body: some View {
-    VStack {
-      ARViewContainer { newFaceDistance in
-        // Only update the face distance state if the change is greater than the threshold
-        if abs(newFaceDistance - previousFaceDistance) > distanceThreshold {
-          faceDistance = newFaceDistance
-          previousFaceDistance = newFaceDistance
-        }
-      }
-      .frame(width: 100, height: 100)
-      
-      if recorderAndPlayer.isRecording {
-        Button("Stop Recording", action: recorderAndPlayer.stopListeningAndSave)
-      } else {
-        Button("Start Recording", action: recorderAndPlayer.startListening)
-      }
-      
+    NavigationSplitView(columnVisibility: $columnVisibility) {
       List(recorderAndPlayer.recordedAudios, id: \.id) { recording in
-        HStack {
+         
           Button("Play", action: {
             recorderAndPlayer.playRecording(recording)
-
+            
           })
           Text(recording.transcription.prefix(30))
-        }
+        
       }
+    } detail: {
       
+          VStack {
+            ARViewContainer { newFaceDistance in
+              // Only update the face distance state if the change is greater than the threshold
+              if abs(newFaceDistance - previousFaceDistance) > distanceThreshold {
+                faceDistance = newFaceDistance
+                previousFaceDistance = newFaceDistance
+              }
+            }
+            .frame(width: 100, height: 100)
       
-      Spacer()
+            if recorderAndPlayer.isRecording {
+              Button("Stop Recording", action: recorderAndPlayer.stopListeningAndSave)
+            } else {
+              Button("Start Recording", action: recorderAndPlayer.startListening)
+            }
       
-      Text(recorderAndPlayer.highlightedWord)
-          .font(.headline)
-          .foregroundColor(.red)
+            Spacer()
       
-      ScrollViewReader { proxy in
-          ScrollView {
-              recorderAndPlayer.transcriptWithHighlightedWord
-                  .font(.system(size: getFontSize()))
-                  .id("end")
-                  .onChange(of: recognizedText) { newValue in
-                      // Process the new recognized text
-                      processRecognizedText(newValue)
+            Text(recorderAndPlayer.highlightedWord)
+                .font(.headline)
+                .foregroundColor(.red)
+            
+            Text("Time: \(recorderAndPlayer.time)")
+                .font(.headline)
+                .foregroundColor(.red)
+          
 
-                      proxy.scrollTo("end", anchor: .bottom)
-                  }.padding()
-          }
-      }
       
-    }        .onAppear(perform: recorderAndPlayer.startListening)
+            ScrollViewReader { proxy in
+                ScrollView {
+//                    recorderAndPlayer.transcriptWithHighlightedWord
+                  Text(recorderAndPlayer.recognizedText)
+                        .font(.system(size: getFontSize()))
+                        .id("end")
+                        .onChange(of: recognizedText) { newValue in
+                            // Process the new recognized text
+                            processRecognizedText(newValue)
+      
+                            proxy.scrollTo("end", anchor: .bottom)
+                        }.padding()
+                }
+            }
+      
+          }        .onAppear(perform: recorderAndPlayer.startListening)
+      
+
+    }
     
   }
   
@@ -112,48 +109,65 @@ struct ContentView: View {
 }
 
 
+struct RecordedAudio : Identifiable, Codable {
+  let id: UUID
+  let fileURL: URL
+  let transcription: String
+  let segments: [Segment]
+}
+
+struct Segment: Codable {
+  let substring: String
+  let timestamp: TimeInterval
+  let duration: TimeInterval
+}
+
 class RecorderAndPlayer: ObservableObject {
   private var audioEngine = AVAudioEngine()
   private var speechRecognizer = SFSpeechRecognizer()
   private var audioFile: AVAudioFile?
   private var audioPlayer: AVAudioPlayer?
   private let recordedAudiosKey = "recordedAudios"
-
+  
   
   @Published var recognizedText: String = ""
   @Published var recordedAudios: [RecordedAudio] = []
   @Published var recognizedSegments: [Segment] = []
   @Published var highlightedWord: String = ""
   private var wordHighlightTimer: Timer?
-//  private var handleSegmentTappped: (Segment) -> Void
+  //  private var handleSegmentTappped: (Segment) -> Void
   
   var isRecording: Bool {
     audioEngine.isRunning
   }
   
+  var time: String {
+    audioPlayer?.currentTime.description ?? ""
+  }
+  
   var transcriptWithHighlightedWord: Text {
-      var text = Text("")
-
-      for segment in recognizedSegments {
-          if segment.substring == highlightedWord {
-            text = text + Text(segment.substring).foregroundColor(.red)
-              
-//              .onTapGesture {
-//              handleSegmentTapped(segment)
-//            }
-            
-            + Text(" ")
-          } else {
-              text = text + Text(segment.substring) + Text(" ")
-          }
+    var text = Text("")
+    
+    for segment in recognizedSegments {
+      if segment.substring == highlightedWord {
+        text = text + Text(segment.substring).foregroundColor(.red)
+        
+        //              .onTapGesture {
+        //              handleSegmentTapped(segment)
+        //            }
+        
+        + Text(" ")
+      } else {
+        text = text + Text(segment.substring) + Text(" ")
       }
-
-      return text
+    }
+    
+    return text
   }
   
   init() {
-        loadRecordedAudios()
-    }
+    loadRecordedAudios()
+  }
   
   func startListening() {
     do {
@@ -167,10 +181,10 @@ class RecorderAndPlayer: ObservableObject {
       
       // Prepare the audio file
       let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-
+      
       let fileUrl = documentsDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("caf")
-        print("Starting recording to file: \(fileUrl)")
-        audioFile = try AVAudioFile(forWriting: fileUrl, settings: inputNode.outputFormat(forBus: 0).settings)
+      print("Starting recording to file: \(fileUrl)")
+      audioFile = try AVAudioFile(forWriting: fileUrl, settings: inputNode.outputFormat(forBus: 0).settings)
       
       inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputNode.outputFormat(forBus: 0)) { [weak self] buffer, _ in
         recognitionRequest.append(buffer)
@@ -189,15 +203,15 @@ class RecorderAndPlayer: ObservableObject {
       try audioEngine.start()
       
       speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
-          if let result = result {
-              let segments = result.bestTranscription.segments.map {
-                  Segment(substring: $0.substring, timestamp: $0.timestamp, duration: $0.duration)
-              }
-              self?.recognizedText = result.bestTranscription.formattedString
-              self?.recognizedSegments = segments
-          } else if let error = error {
-              print("Recognition failed: \(error)")
+        if let result = result {
+          let segments = result.bestTranscription.segments.map {
+            Segment(substring: $0.substring, timestamp: $0.timestamp, duration: $0.duration)
           }
+          self?.recognizedText = result.bestTranscription.formattedString
+          self?.recognizedSegments = segments
+        } else if let error = error {
+          print("Recognition failed: \(error)")
+        }
       }
     } catch {
       print("Failed to set up speech recognition: \(error)")
@@ -217,55 +231,57 @@ class RecorderAndPlayer: ObservableObject {
     
     recognizedText = ""
     print("Finished recording to file: \(audioFile!.url)")
-
+    
     return recordedAudio
   }
   
-
+  
   func stopListeningAndSave() {
-      let recordedAudio = stopListening()
-      recordedAudios.append(recordedAudio)
-      print("Saving recording: \(recordedAudio)")
-      saveRecordedAudios()
+    let recordedAudio = stopListening()
+    recordedAudios.append(recordedAudio)
+    print("Saving recording: \(recordedAudio)")
+    saveRecordedAudios()
   }
   
   private func saveRecordedAudios() {
-      let recordedAudiosData = try? JSONEncoder().encode(recordedAudios)
-      UserDefaults.standard.set(recordedAudiosData, forKey: recordedAudiosKey)
-      print("Saved recordings to UserDefaults")
+    let recordedAudiosData = try? JSONEncoder().encode(recordedAudios)
+    UserDefaults.standard.set(recordedAudiosData, forKey: recordedAudiosKey)
+    print("Saved recordings to UserDefaults")
   }
-
+  
   private func loadRecordedAudios() {
-      guard let recordedAudiosData = UserDefaults.standard.data(forKey: recordedAudiosKey),
-            let recordedAudios = try? JSONDecoder().decode([RecordedAudio].self, from: recordedAudiosData) else {
-          return
-      }
-      self.recordedAudios = recordedAudios
-      print("Loaded recordings from UserDefaults: \(recordedAudios)")
-
+    guard let recordedAudiosData = UserDefaults.standard.data(forKey: recordedAudiosKey),
+          let recordedAudios = try? JSONDecoder().decode([RecordedAudio].self, from: recordedAudiosData) else {
+      return
+    }
+    self.recordedAudios = recordedAudios
+    print("Loaded recordings from UserDefaults: \(recordedAudios)")
+    
   }
   
   
   func playRecording(_ recording: RecordedAudio) {
-      do {
-          print("Playing recording from file: \(recording.fileURL)")
-          audioPlayer = try AVAudioPlayer(contentsOf: recording.fileURL)
-          audioPlayer?.play()
-          
-          // Clear any existing timer
-          wordHighlightTimer?.invalidate()
-          
-          // Start a new timer
-          wordHighlightTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-              let currentTime = self?.audioPlayer?.currentTime ?? 0
-              let currentWord = recording.segments.first { segment in
-                  currentTime >= segment.timestamp && currentTime <= segment.timestamp + segment.duration
-              }?.substring
-              self?.highlightedWord = currentWord ?? ""
-          }
-      } catch {
-          print("Failed to play audio file: \(error)")
-      }
+    do {
+      print("Playing recording from file: \(recording.fileURL)")
+      audioPlayer = try AVAudioPlayer(contentsOf: recording.fileURL)
+      print("Before play")
+      audioPlayer?.play()
+      print("After play")
+      
+      // Clear any existing timer
+//      wordHighlightTimer?.invalidate()
+      
+      // Start a new timer
+//      wordHighlightTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+//        let currentTime = self?.audioPlayer?.currentTime ?? 0
+//        let currentWord = recording.segments.first { segment in
+//          currentTime >= segment.timestamp && currentTime <= segment.timestamp + segment.duration
+//        }?.substring
+//        self?.highlightedWord = currentWord ?? ""
+//      }
+    } catch {
+      print("Failed to play audio file: \(error)")
+    }
   }
 }
 
