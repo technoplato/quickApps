@@ -15,6 +15,13 @@ struct RecordedAudio : Identifiable, Codable {
     let id: UUID
     let fileURL: URL
     let transcription: String
+    let segments: [Segment]  // new property
+}
+
+struct Segment: Codable {
+    let substring: String
+    let timestamp: TimeInterval
+    let duration: TimeInterval
 }
 
 struct ContentView: View {
@@ -33,6 +40,7 @@ struct ContentView: View {
   let ss = ["one", "two"]
   
   
+  @ViewBuilder
   var body: some View {
     VStack {
       ARViewContainer { newFaceDistance in
@@ -50,18 +58,22 @@ struct ContentView: View {
         Button("Start Recording", action: recorderAndPlayer.startListening)
       }
       
-      List(recorderAndPlayer.recordedAudios, id: \.id) { s in
+      List(recorderAndPlayer.recordedAudios, id: \.id) { recording in
         HStack {
           Button("Play", action: {
-            recorderAndPlayer.playRecording(at: s)
+            recorderAndPlayer.playRecording(recording)
 
           })
-          Text(s.transcription.prefix(30))
+          Text(recording.transcription.prefix(30))
         }
       }
       
       
       Spacer()
+      
+      Text(recorderAndPlayer.highlightedWord)
+          .font(.headline)
+          .foregroundColor(.red)
       
       ScrollViewReader { proxy in
         ScrollView {
@@ -78,7 +90,7 @@ struct ContentView: View {
         }
       }
       
-    }        .onAppear(perform: startListening)
+    }        .onAppear(perform: recorderAndPlayer.startListening)
     
   }
   
@@ -102,34 +114,37 @@ struct ContentView: View {
   }
   
   
-  func startListening() {
-    do {
-      let audioSession = AVAudioSession.sharedInstance()
-      try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
-      try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
-      
-      let recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
-      
-      let inputNode = audioEngine.inputNode
-      inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputNode.outputFormat(forBus: 0)) { buffer, _ in
-        recognitionRequest.append(buffer)
-      }
-      
-      audioEngine.prepare()
-      try audioEngine.start()
-      
-      speechRecognizer?.recognitionTask(with: recognitionRequest) { result, error in
-        if let result = result {
-          
-          self.recognizedText = result.bestTranscription.formattedString
-        } else if let error = error {
-          print("Recognition failed: \(error)")
-        }
-      }
-    } catch {
-      print("Failed to set up speech recognition: \(error)")
-    }
-  }
+//  func startListening() {
+//    do {
+//      let audioSession = AVAudioSession.sharedInstance()
+//      try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
+//      try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+//      
+//      let recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
+//      
+//      let inputNode = audioEngine.inputNode
+//      inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputNode.outputFormat(forBus: 0)) { buffer, _ in
+//        recognitionRequest.append(buffer)
+//      }
+//      
+//      audioEngine.prepare()
+//      try audioEngine.start()
+//      
+//      speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
+//          if let result = result {
+//              let segments = result.bestTranscription.segments.map {
+//                  Segment(substring: $0.substring, timestamp: $0.timestamp, duration: $0.duration)
+//              }
+//              self?.recognizedText = result.bestTranscription.formattedString
+//              self?.recognizedSegments = segments
+//          } else if let error = error {
+//              print("Recognition failed: \(error)")
+//          }
+//      }
+//    } catch {
+//      print("Failed to set up speech recognition: \(error)")
+//    }
+//  }
 }
 
 
@@ -143,6 +158,9 @@ class RecorderAndPlayer: ObservableObject {
   
   @Published var recognizedText: String = ""
   @Published var recordedAudios: [RecordedAudio] = []
+  @Published var recognizedSegments: [Segment] = []
+  @Published var highlightedWord: String = ""
+  private var wordHighlightTimer: Timer?
   
   var isRecording: Bool {
     audioEngine.isRunning
@@ -183,11 +201,15 @@ class RecorderAndPlayer: ObservableObject {
       try audioEngine.start()
       
       speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
-        if let result = result {
-          self?.recognizedText = result.bestTranscription.formattedString
-        } else if let error = error {
-          print("Recognition failed: \(error)")
-        }
+          if let result = result {
+              let segments = result.bestTranscription.segments.map {
+                  Segment(substring: $0.substring, timestamp: $0.timestamp, duration: $0.duration)
+              }
+              self?.recognizedText = result.bestTranscription.formattedString
+              self?.recognizedSegments = segments
+          } else if let error = error {
+              print("Recognition failed: \(error)")
+          }
       }
     } catch {
       print("Failed to set up speech recognition: \(error)")
@@ -201,7 +223,8 @@ class RecorderAndPlayer: ObservableObject {
     let recordedAudio = RecordedAudio(
       id: UUID(),
       fileURL: audioFile!.url,
-      transcription: recognizedText
+      transcription: recognizedText,
+      segments: recognizedSegments
     )
     
     return recordedAudio
@@ -228,18 +251,25 @@ class RecorderAndPlayer: ObservableObject {
   }
   
   
-  func playRecording(at recording: RecordedAudio) {
-    let url = recording.fileURL
-    let transcription = recording.transcription
-    recognizedText = transcription
-//    guard let audioFile = audioFile else { return }
-    
-    do {
-      audioPlayer = try AVAudioPlayer(contentsOf: url)
-      audioPlayer?.play()
-    } catch {
-      print("Failed to play audio file: \(error)")
-    }
+  func playRecording(_ recording: RecordedAudio) {
+      do {
+          audioPlayer = try AVAudioPlayer(contentsOf: recording.fileURL)
+          audioPlayer?.play()
+          
+          // Clear any existing timer
+          wordHighlightTimer?.invalidate()
+          
+          // Start a new timer
+          wordHighlightTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+              let currentTime = self?.audioPlayer?.currentTime ?? 0
+              let currentWord = recording.segments.first { segment in
+                  currentTime >= segment.timestamp && currentTime <= segment.timestamp + segment.duration
+              }?.substring
+              self?.highlightedWord = currentWord ?? ""
+          }
+      } catch {
+          print("Failed to play audio file: \(error)")
+      }
   }
 }
 
