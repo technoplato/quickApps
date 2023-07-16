@@ -76,18 +76,17 @@ struct ContentView: View {
           .foregroundColor(.red)
       
       ScrollViewReader { proxy in
-        ScrollView {
-          Text(recorderAndPlayer.recognizedText)
-            .font(.system(size: getFontSize()))
-            .id("end")
-            .onChange(of: recognizedText) { newValue in
-              // Process the new recognized text
-              processRecognizedText(newValue)
-              
-              
-              proxy.scrollTo("end", anchor: .bottom)
-            }.padding()
-        }
+          ScrollView {
+              recorderAndPlayer.transcriptWithHighlightedWord
+                  .font(.system(size: getFontSize()))
+                  .id("end")
+                  .onChange(of: recognizedText) { newValue in
+                      // Process the new recognized text
+                      processRecognizedText(newValue)
+
+                      proxy.scrollTo("end", anchor: .bottom)
+                  }.padding()
+          }
       }
       
     }        .onAppear(perform: recorderAndPlayer.startListening)
@@ -103,8 +102,6 @@ struct ContentView: View {
     } else if words.contains("smaller") || words.contains("decrease") {
       baseFontSize -= 10
     }
-    
-    print(baseFontSize)
   }
   
   
@@ -112,39 +109,6 @@ struct ContentView: View {
     
     return CGFloat(abs(faceDistance) * baseFontSize)
   }
-  
-  
-//  func startListening() {
-//    do {
-//      let audioSession = AVAudioSession.sharedInstance()
-//      try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
-//      try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
-//      
-//      let recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
-//      
-//      let inputNode = audioEngine.inputNode
-//      inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputNode.outputFormat(forBus: 0)) { buffer, _ in
-//        recognitionRequest.append(buffer)
-//      }
-//      
-//      audioEngine.prepare()
-//      try audioEngine.start()
-//      
-//      speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
-//          if let result = result {
-//              let segments = result.bestTranscription.segments.map {
-//                  Segment(substring: $0.substring, timestamp: $0.timestamp, duration: $0.duration)
-//              }
-//              self?.recognizedText = result.bestTranscription.formattedString
-//              self?.recognizedSegments = segments
-//          } else if let error = error {
-//              print("Recognition failed: \(error)")
-//          }
-//      }
-//    } catch {
-//      print("Failed to set up speech recognition: \(error)")
-//    }
-//  }
 }
 
 
@@ -161,9 +125,30 @@ class RecorderAndPlayer: ObservableObject {
   @Published var recognizedSegments: [Segment] = []
   @Published var highlightedWord: String = ""
   private var wordHighlightTimer: Timer?
+//  private var handleSegmentTappped: (Segment) -> Void
   
   var isRecording: Bool {
     audioEngine.isRunning
+  }
+  
+  var transcriptWithHighlightedWord: Text {
+      var text = Text("")
+
+      for segment in recognizedSegments {
+          if segment.substring == highlightedWord {
+            text = text + Text(segment.substring).foregroundColor(.red)
+              
+//              .onTapGesture {
+//              handleSegmentTapped(segment)
+//            }
+            
+            + Text(" ")
+          } else {
+              text = text + Text(segment.substring) + Text(" ")
+          }
+      }
+
+      return text
   }
   
   init() {
@@ -181,8 +166,11 @@ class RecorderAndPlayer: ObservableObject {
       let inputNode = audioEngine.inputNode
       
       // Prepare the audio file
-      let fileUrl = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("caf")
-      audioFile = try AVAudioFile(forWriting: fileUrl, settings: inputNode.outputFormat(forBus: 0).settings)
+      let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+
+      let fileUrl = documentsDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("caf")
+        print("Starting recording to file: \(fileUrl)")
+        audioFile = try AVAudioFile(forWriting: fileUrl, settings: inputNode.outputFormat(forBus: 0).settings)
       
       inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputNode.outputFormat(forBus: 0)) { [weak self] buffer, _ in
         recognitionRequest.append(buffer)
@@ -227,6 +215,9 @@ class RecorderAndPlayer: ObservableObject {
       segments: recognizedSegments
     )
     
+    recognizedText = ""
+    print("Finished recording to file: \(audioFile!.url)")
+
     return recordedAudio
   }
   
@@ -234,12 +225,14 @@ class RecorderAndPlayer: ObservableObject {
   func stopListeningAndSave() {
       let recordedAudio = stopListening()
       recordedAudios.append(recordedAudio)
+      print("Saving recording: \(recordedAudio)")
       saveRecordedAudios()
   }
   
   private func saveRecordedAudios() {
       let recordedAudiosData = try? JSONEncoder().encode(recordedAudios)
       UserDefaults.standard.set(recordedAudiosData, forKey: recordedAudiosKey)
+      print("Saved recordings to UserDefaults")
   }
 
   private func loadRecordedAudios() {
@@ -248,11 +241,14 @@ class RecorderAndPlayer: ObservableObject {
           return
       }
       self.recordedAudios = recordedAudios
+      print("Loaded recordings from UserDefaults: \(recordedAudios)")
+
   }
   
   
   func playRecording(_ recording: RecordedAudio) {
       do {
+          print("Playing recording from file: \(recording.fileURL)")
           audioPlayer = try AVAudioPlayer(contentsOf: recording.fileURL)
           audioPlayer?.play()
           
