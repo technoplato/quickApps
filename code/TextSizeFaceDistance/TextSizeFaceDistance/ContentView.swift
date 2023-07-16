@@ -14,12 +14,15 @@ import Speech
 struct ContentView: View {
   @State private var faceDistance: Float = 0
   @State private var previousFaceDistance: Float = 0
+  
   @State private var recognizedText: String = ""
+  @State private var baseFontSize: Float = 72
   
   private let audioEngine = AVAudioEngine()
   private let speechRecognizer = SFSpeechRecognizer()
   
-  let distanceThreshold: Float = 0.001 // Set a threshold for significant changes
+  let distanceThreshold: Float = 0.01 // Set a threshold for significant changes
+  
   
   var body: some View {
     VStack {
@@ -30,23 +33,46 @@ struct ContentView: View {
           previousFaceDistance = newFaceDistance
         }
       }
-      .frame(width: 200, height: 200)
+      .frame(width: 100, height: 100)
       
-      Text("Face Distance: \(faceDistance)")
-        .font(.system(size: getFontSize()))
+      Spacer()
       
-      Text("Recognized Text: \(recognizedText)")
-              
-        .font(.system(size: getFontSize()))  
+      ScrollViewReader { proxy in
+          ScrollView {
+              Text("Recognized Text: \(recognizedText)")
+                  .font(.system(size: getFontSize()))
+                  .id("end")
+                  .onChange(of: recognizedText) { newValue in
+                    // Process the new recognized text
+                      processRecognizedText(newValue)
+                                              
+                    
+                      proxy.scrollTo("end", anchor: .bottom)
+                  }.padding()
+          }
+      }
 
     }        .onAppear(perform: startListening)
     
   }
   
+  func processRecognizedText(_ text: String) {
+    let last = text.lowercased().split(separator: " ").last
+    let words = [last]
+      
+      if words.contains("bigger") || words.contains("increase") {
+          baseFontSize += 10
+      } else if words.contains("smaller") || words.contains("decrease") {
+          baseFontSize -= 10
+      }
+    
+      print(baseFontSize)
+  }
+  
   
    func getFontSize() -> CGFloat {
      
-       return CGFloat(abs(faceDistance) * 72)
+       return CGFloat(abs(faceDistance) * baseFontSize)
    }
   
   
@@ -69,6 +95,7 @@ struct ContentView: View {
             
             speechRecognizer?.recognitionTask(with: recognitionRequest) { result, error in
                 if let result = result {
+
                     self.recognizedText = result.bestTranscription.formattedString
                 } else if let error = error {
                     print("Recognition failed: \(error)")
